@@ -49,7 +49,7 @@ access_key_status() {
 }
 
 auto_rotation_tag() {
-    log "Looking for AutoRotation:yes tag" >>logs.txt
+    log "Looking for AutoRotation:yes tag [ ${user} ]" >>logs.txt
     aws iam list-user-tags \
     --profile ${aws_profile} \
     --user-name "${user}" \
@@ -126,10 +126,11 @@ delete_old_access_key() {
     log_success "The old access key [$1] is Deleted for the user ${user}" >>logs.txt
 }
 
-log "----------------| Sart |----------------" >>logs.txt
+# The Magic Starts Here!
+log "-------------------| Sart |-------------------" >>logs.txt
 for user in $(get_user_name); do
     if [ "$(auto_rotation_tag)" = "Yes" ]; then
-        log "[ ${user} ]" >>logs.txt
+        log "--------------[ ${user} ]--------------" >>logs.txt
         if [[ "$(access_key_status)" == *"Inactive"* ]]; then
             log "Inactive access key found for user ${user}" >>logs.txt
             inactive_access_key="$(inactive_access_keys)"
@@ -149,4 +150,4 @@ done
 # Cleanup
 log "Cleanup" >>logs.txt
 rm temp
-log "----------------| Done |----------------" >>logs.txt
+log "-------------------| Done |-------------------" >>logs.txt
