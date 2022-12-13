@@ -27,7 +27,10 @@ while getopts e:o:p:b: option; do
     esac
 done
 
-# TODO: 
+# TODO:
+# - Add condition to check if the user have more than two active keys
+# - add an option to pass the user name as an argument run bypass get_user_name() function
+# - Add notification system
 
 get_user_name() {
     log "Getting all users" >>logs.txt
