@@ -27,6 +27,8 @@ while getopts e:o:p:b: option; do
     esac
 done
 
+# TODO: 
+
 get_user_name() {
     log "Getting all users" >>logs.txt
     aws iam list-users \
@@ -35,7 +37,7 @@ get_user_name() {
 }
 
 access_key_status() {
-    log "Getting access key status [${user}]" >>logs.txt
+    log "Getting access keys status" >>logs.txt
     aws iam list-access-keys \
     --profile ${aws_profile} \
     --user "${user}" \
@@ -44,7 +46,7 @@ access_key_status() {
 }
 
 auto_rotation_tag() {
-    log "Looking for AutoRotation:yes tag [${user}]" >>logs.txt
+    log "Looking for AutoRotation:yes tag" >>logs.txt
     aws iam list-user-tags \
     --profile ${aws_profile} \
     --user-name "${user}" \
@@ -53,7 +55,7 @@ auto_rotation_tag() {
 }
 
 active_access_keys() {
-    log "Looking for active access keys [${user}]" >>logs.txt
+    log "Looking for active access keys" >>logs.txt
     aws iam list-access-keys \
     --profile ${aws_profile} \
     --user-name "${user}" \
@@ -62,7 +64,7 @@ active_access_keys() {
 }
 
 inactive_access_keys() {
-    log "Looking for inactive access keys [${user}]" >>logs.txt
+    log "Looking for inactive access keys" >>logs.txt
     aws iam list-access-keys \
     --profile ${aws_profile} \
     --user-name "${user}" \
@@ -71,67 +73,67 @@ inactive_access_keys() {
 }
 
 create_new_access_key() {
-    log "Creating new access keys [${user}]" >>logs.txt
+    log "Creating new access keys" >>logs.txt
     echo $(
         aws iam create-access-key \
         --profile ${aws_profile} \
         --user-name "${user}"
     ) >./temp
-    log_success "Creating new access keys [${user}]" >>logs.txt
+    log_success "A new access keys created successfully for the user ${user}" >>logs.txt
 }
 
 set_gh_secrets() {
-    log "Setting GitHub secrets [${user}]" >>logs.txt
+    log "Setting GitHub secrets" >>logs.txt
     new_access_key_id=$(grep -o '"AccessKeyId": "[^"]*' ./temp | grep -o '[^"]*$')
     new_secret_access_key=$(grep -o '"SecretAccessKey": "[^"]*' ./temp | grep -o '[^"]*$')
     gh secret set --org ${github_org} ${env_prefix}AWS_ACCESS_KEY_ID --body ${new_access_key_id}
     gh secret set --org ${github_org} ${env_prefix}AWS_SECRET_ACCESS_KEY --body ${new_secret_access_key}
-    log_success "Setting GitHub secrets [${user}]" >>logs.txt
+    log_success "GitHub secrets updated for the user ${user}" >>logs.txt
 }
 
 backup_to_s3_bucket() {
     if [ -z "$aws_bucket" ]; then
         log_error "No S3 bucket is set!" >>logs.txt
     else
-        log "Backup to S3 bucket [${user}]" >>logs.txt
+        log "Backup the new AWS Access Key to S3 bucket" >>logs.txt
         file_name=${env_prefix}${user}_$(date +%F_%T).txt
         echo -e "[${user}]\n${env_prefix}AWS_ACCESS_KEY_ID = ${new_access_key_id}\n${env_prefix}AWS_SECRET_ACCESS_KEY = ${new_secret_access_key}" >./$file_name
         aws s3 cp --profile ${aws_profile} ./$file_name s3://${aws_bucket}/$file_name
-        log_success "Backup to S3 bucket [${user}]" >>logs.txt
+        log_success "Backup file uploaded to S3 bucket for the user ${user}" >>logs.txt
         rm $file_name
     fi
 }
 
 deactivate_old_access_key() {
-    log_warning "Deactivating old access key [$1] for the user [${user}]" >>logs.txt
+    log_warning "Deactivating the old access key [$1]" >>logs.txt
     aws iam update-access-key \
     --profile ${aws_profile} \
     --user-name "${user}" \
     --access-key-id "$1" \
     --status Inactive
-    log_success "Deactivating old access key [$1] for the user [${user}]" >>logs.txt
+    log_success "The old access key [$1] is deactivated for the user ${user}" >>logs.txt
 }
 
 delete_old_access_key() {
-    log_warning "Deleting old access key [$1] for the user [${user}]" >>logs.txt
+    log_warning "Deleting old access key [$1]" >>logs.txt
     aws iam delete-access-key \
     --profile ${aws_profile} \
     --user-name "${user}" \
     --access-key-id "$1"
-    log_success "Deleting old access key [$1] for the user [${user}]" >>logs.txt
+    log_success "The old access key [$1] is Deleted for the user ${user}" >>logs.txt
 }
 
 log "----------------| Sart |----------------" >>logs.txt
 for user in $(get_user_name); do
     if [ "$(auto_rotation_tag)" = "Yes" ]; then
-        log "Tag AutoRotation:yes found for user [${user}]" >>logs.txt
+        log "[ ${user} ]" >>logs.txt
         if [[ "$(access_key_status)" == *"Inactive"* ]]; then
-            log "Inactive access key found for user [${user}]" >>logs.txt
+            log "Inactive access key found for user ${user}" >>logs.txt
             inactive_access_key="$(inactive_access_keys)"
             delete_old_access_key "${inactive_access_key}"
         fi
         if [[ "$(access_key_status)" == *"Active"* ]]; then
-            log "Active access key found for user [${user}]" >>logs.txt
+            log "Active access key found for user ${user}" >>logs.txt
             active_access_key="$(active_access_keys)"
             create_new_access_key
             set_gh_secrets
